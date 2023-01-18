@@ -36,6 +36,7 @@ use Exception;
 use Smalot\PdfParser\Element\ElementNumeric;
 use Smalot\PdfParser\Encoding\EncodingLocator;
 use Smalot\PdfParser\Encoding\PostScriptGlyphs;
+use Smalot\PdfParser\Encoding\StandardEncoding;
 use Smalot\PdfParser\Exception\EncodingNotFoundException;
 
 /**
@@ -64,39 +65,42 @@ class Encoding extends PDFObject
         $this->differences = [];
         $this->encoding = [];
 
+        $encodingClass = StandardEncoding::class;
         if ($this->has('BaseEncoding')) {
-            $this->encoding = EncodingLocator::getEncoding($this->getEncodingClass())->getTranslations();
+            $encodingClass = $this->getEncodingClass();
+        }
 
-            // Build table including differences.
-            $differences = $this->get('Differences')->getContent();
-            $code = 0;
+        $this->encoding = EncodingLocator::getEncoding($encodingClass)->getTranslations();
 
-            if (!\is_array($differences)) {
-                return;
+        // Build table including differences.
+        $differences = $this->get('Differences')->getContent();
+        $code = 0;
+
+        if (!\is_array($differences)) {
+            return;
+        }
+
+        foreach ($differences as $difference) {
+            /** @var ElementNumeric $difference */
+            if ($difference instanceof ElementNumeric) {
+                $code = $difference->getContent();
+                continue;
             }
 
-            foreach ($differences as $difference) {
-                /** @var ElementNumeric $difference */
-                if ($difference instanceof ElementNumeric) {
-                    $code = $difference->getContent();
-                    continue;
-                }
-
-                // ElementName
-                $this->differences[$code] = $difference;
-                if (\is_object($difference)) {
-                    $this->differences[$code] = $difference->getContent();
-                }
-
-                // For the next char.
-                ++$code;
+            // ElementName
+            $this->differences[$code] = $difference;
+            if (\is_object($difference)) {
+                $this->differences[$code] = $difference->getContent();
             }
 
-            $this->mapping = $this->encoding;
-            foreach ($this->differences as $code => $difference) {
-                /* @var string $difference */
-                $this->mapping[$code] = $difference;
-            }
+            // For the next char.
+            ++$code;
+        }
+
+        $this->mapping = $this->encoding;
+        foreach ($this->differences as $code => $difference) {
+            /* @var string $difference */
+            $this->mapping[$code] = $difference;
         }
     }
 
